@@ -110,13 +110,11 @@ def make_ipaddress_url(raw_url: str):
     :return: ipaddress 的 url
     """
     dot_count = raw_url.count(".")
-    if dot_count > 1:
-        raw_url_list = raw_url.split(".")
-        tmp_url = raw_url_list[-2] + "." + raw_url_list[-1]
-        ipaddress_url = "https://" + tmp_url + IPADDRESS_PREFIX + "/" + raw_url
-    else:
-        ipaddress_url = "https://" + raw_url + IPADDRESS_PREFIX
-    return ipaddress_url
+    if dot_count <= 1:
+        return f"https://{raw_url}{IPADDRESS_PREFIX}"
+    raw_url_list = raw_url.split(".")
+    tmp_url = f"{raw_url_list[-2]}.{raw_url_list[-1]}"
+    return f"https://{tmp_url}{IPADDRESS_PREFIX}/{raw_url}"
 
 
 @retry(tries=3)
@@ -126,12 +124,11 @@ def get_ip(session: requests.session, raw_url: str):
         rs = session.get(url, timeout=5)
         pattern = r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b"
         ip_list = re.findall(pattern, rs.text)
-        ip_counter_obj = Counter(ip_list).most_common(1)
-        if ip_counter_obj:
+        if ip_counter_obj := Counter(ip_list).most_common(1):
             return raw_url, ip_counter_obj[0][0]
         raise Exception("ip address empty")
     except Exception as ex:
-        print("get: {}, error: {}".format(url, ex))
+        print(f"get: {url}, error: {ex}")
         raise Exception
 
 
@@ -140,7 +137,7 @@ def update_gitee_gist(session: requests.session, host_content):
     gitee_token = os.getenv("gitee_token")
     gitee_gist_id = os.getenv("gitee_gist_id")
     gist_file_name = os.getenv("gitee_gist_file_name")
-    url = "https://gitee.com/api/v5/gists/{}".format(gitee_gist_id)
+    url = f"https://gitee.com/api/v5/gists/{gitee_gist_id}"
     headers = {
         "Content-Type": "application/json"}
     data = {
@@ -154,8 +151,7 @@ def update_gitee_gist(session: requests.session, host_content):
         if response.status_code == 200:
             print("update gitee gist success")
         else:
-            print("update gitee gist fail: {} {}".format(response.status_code,
-                                                         response.content))
+            print(f"update gitee gist fail: {response.status_code} {response.content}")
     except Exception as e:
         traceback.print_exc(e)
         raise Exception(e)
@@ -178,8 +174,7 @@ def main():
     update_time = datetime.utcnow().astimezone(
         timezone(timedelta(hours=8))).replace(microsecond=0).isoformat()
     hosts_content = HOSTS_TEMPLATE.format(content=content, update_time=update_time)
-    has_change = write_file(hosts_content, update_time)
-    if has_change:
+    if has_change := write_file(hosts_content, update_time):
         write_json_file(content_list)
     print(hosts_content)
 
